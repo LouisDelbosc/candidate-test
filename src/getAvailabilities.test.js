@@ -1,5 +1,6 @@
 import knex from 'knexClient';
-import { getAvailabilities, getOpenings } from './getAvailabilities';
+import moment from 'moment'
+import { getAvailabilities, getOpenings, rangeDate } from './getAvailabilities';
 
 const openingFactory = (args = {}) => {
   return Object.assign({
@@ -56,7 +57,27 @@ describe('getAvailabilities', () => {
       const openingDates = await getOpenings(new Date('2014-08-10'));
       expect(openingDates.length).toBe(0);
     });
+  });
 
+  describe('generateSlots', () => {
+    it('should generate all the date between two date with 30min interval', () => {
+      const start = moment(new Date('2014-08-10 12:30'));
+      const end = moment(new Date('2014-08-10 09:30'));
+      expect(rangeDate(start, end)).toEqual([]);
+    });
+
+    it('should generate all the date between two date with 30min interval', () => {
+      const start = moment(new Date('2014-08-10 09:30'));
+      const end = moment(new Date('2014-08-10 12:30'));
+      expect(rangeDate(start, end)).toEqual([
+        moment(new Date('2014-08-10 09:30')),
+        moment(new Date('2014-08-10 10:00')),
+        moment(new Date('2014-08-10 10:30')),
+        moment(new Date('2014-08-10 11:00')),
+        moment(new Date('2014-08-10 11:30')),
+        moment(new Date('2014-08-10 12:00')),
+      ]);
+    });
   });
 
   // describe('simple case', () => {
