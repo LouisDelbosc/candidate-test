@@ -3,8 +3,10 @@ import knex from 'knexClient'
 
 // export async function getAvailabilities(date) {
 //   // Implement your algorithm here
-//   const open = await getOpenings(date)
-//   return open
+//   const opens = await getOpenings(date)
+//   const slots = generateSlot(opens)
+//   groupby(slot, day)
+//   formatAvailabilities(day, groupbied)
 // }
 
 const cloneDate = (momentDate) => {
@@ -18,8 +20,16 @@ const toOpening = (start, end) => {
   };
 };
 
+export const groupby = (list, func) => {
+  return list.reduce((acc, value) => {
+    const key = func(value);
+    const oldValue = acc[key] || [];
+    return Object.assign(acc, {[key]: [ ...oldValue, value]});
+  }, {});
+};
+
 export const getOpenings = async (date) => {
-  const date_with_7_days = moment(date).add(7, 'days');
+  const date_with_7_days = cloneDate(date).add(7, 'days');
   const reccuring_opening = await knex('events')
         .select('starts_at', 'ends_at')
         .where({kind: 'opening', weekly_recurring: true})
@@ -27,15 +37,16 @@ export const getOpenings = async (date) => {
   const weekly_opening = await knex('events')
         .select('starts_at', 'ends_at')
         .where({kind: 'opening', weekly_recurring: false})
-        .andWhere('starts_at', '>=', date.getTime())
+        .andWhere('starts_at', '>=', date.valueOf())
         .andWhere('ends_at', '<=', date_with_7_days.valueOf());
 
   return [...reccuring_opening, ...weekly_opening]
-    .map(opening => toOpening(moment(opening.starts_at), moment(opening.ends_at)));
+    .map(opening => toOpening(moment(opening.starts_at), moment(opening.ends_at)))
+    .map(opening => intoCurrentWeek(date, opening));
 };
 
-export const intoCurrentWeek = (day, reccuring_opening) => {
-  const { starts_at, ends_at } = reccuring_opening;
+export const intoCurrentWeek = (day, opening) => {
+  const { starts_at, ends_at } = opening;
   while (starts_at < day) {
     starts_at.add(7, 'days');
     ends_at.add(7, 'days');

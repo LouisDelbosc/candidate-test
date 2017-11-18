@@ -1,6 +1,12 @@
 import knex from 'knexClient';
-import moment from 'moment'
-import { getAvailabilities, getOpenings, rangeDate, intoCurrentWeek } from './getAvailabilities';
+import moment from 'moment';
+import {
+  getAvailabilities,
+  getOpenings,
+  rangeDate,
+  intoCurrentWeek,
+  groupby,
+} from './getAvailabilities';
 
 const openingFactory = (args = {}) => {
   return Object.assign({
@@ -14,6 +20,44 @@ const openingFactory = (args = {}) => {
 const dateFactory = (date) => {
   return moment(new Date(date));
 };
+
+describe('utils', () => {
+  describe('groupby()', () => {
+    it('should group by odd or not odd', () => {
+      const numbers = [1, 2, 3, 4, 5];
+      expect(groupby(numbers, (n) => n % 2)).toEqual({
+        0: [2, 4],
+        1: [1, 3, 5]
+      });
+    });
+
+    it('should group datetime by day', () => {
+      const datetime_array = [
+        dateFactory('2014-08-10 09:30'),
+        dateFactory('2014-08-10 10:00'),
+        dateFactory('2014-08-10 10:30'),
+        dateFactory('2014-08-11 11:00'),
+        dateFactory('2014-08-12 11:30'),
+        dateFactory('2014-08-12 12:00'),
+      ];
+      const groupbyDate = groupby(datetime_array, (date) => String(date.clone().startOf('days')));
+      expect(groupbyDate).toEqual({
+        [String(dateFactory('2014-08-10').startOf('days'))]: [
+          dateFactory('2014-08-10 09:30'),
+          dateFactory('2014-08-10 10:00'),
+          dateFactory('2014-08-10 10:30'),
+        ],
+        [String(dateFactory('2014-08-11').startOf('days'))]: [
+          dateFactory('2014-08-11 11:00'),
+        ],
+        [String(dateFactory('2014-08-12').startOf('days'))]: [
+          dateFactory('2014-08-12 11:30'),
+          dateFactory('2014-08-12 12:00'),
+        ]
+      });
+    });
+  });
+});
 
 describe('getAvailabilities', () => {
   beforeEach(() => knex('events').truncate());
@@ -45,7 +89,7 @@ describe('getAvailabilities', () => {
     it('should get recurring opening where starts_date < arg_date', async () => {
       const opening = openingFactory({ weekly_recurring: true });
       await knex('events').insert(opening);
-      const openingDates = await getOpenings(new Date('2014-08-10'));
+      const openingDates = await getOpenings(dateFactory('2014-08-10'));
       expect(openingDates.length).toBe(1);
     });
 
@@ -56,14 +100,29 @@ describe('getAvailabilities', () => {
         weekly_recurring: true
       });
       await knex('events').insert(opening);
-      const openingDates = await getOpenings(new Date('2014-08-10'));
+      const openingDates = await getOpenings(dateFactory('2014-08-10'));
       expect(openingDates.length).toBe(0);
+    });
+
+    it('should get recurring opening in the past in the right week', async () => {
+      const opening = openingFactory({
+        starts_at: new Date('2014-08-04 09:30'),
+        ends_at: new Date('2014-08-04 12:30'),
+        weekly_recurring: true
+      });
+      await knex('events').insert(opening);
+      const openingDates = await getOpenings(dateFactory('2014-08-10'));
+      expect(openingDates.length).toBe(1);
+      expect(openingDates[0]).toEqual({
+        starts_at: dateFactory('2014-08-11 09:30'),
+        ends_at: dateFactory('2014-08-11 12:30')
+      });
     });
 
     it('should not get opening where the date is already passed', async () => {
       const opening = openingFactory({ weekly_recurring: false });
       await knex('events').insert(opening);
-      const openingDates = await getOpenings(new Date('2014-08-10'));
+      const openingDates = await getOpenings(dateFactory('2014-08-10'));
       expect(openingDates.length).toBe(0);
     });
 
@@ -74,26 +133,26 @@ describe('getAvailabilities', () => {
         weekly_recurring: false
       });
       await knex('events').insert(opening);
-      const openingDates = await getOpenings(new Date('2014-08-10'));
+      const openingDates = await getOpenings(dateFactory('2014-08-10'));
       expect(openingDates.length).toBe(1);
     });
 
     it('should not get appointment', async () => {
       const opening = openingFactory({ kind: 'appointment' });
       await knex('events').insert(opening);
-      const openingDates = await getOpenings(new Date('2014-08-10'));
+      const openingDates = await getOpenings(dateFactory('2014-08-10'));
       expect(openingDates.length).toBe(0);
     });
   });
 
-  describe('generateSlots', () => {
-    it('should generate all the date between two date with 30min interval', () => {
+  describe('rangeDate', () => {
+    it('should generate empty array if the interval is invalid', () => {
       const start = dateFactory('2014-08-10 12:30');
       const end = dateFactory('2014-08-10 09:30');
       expect(rangeDate(start, end)).toEqual([]);
     });
 
-    it('should generate all the date between two date with 30min interval', () => {
+    it('should generate a range between two date with 30min interval', () => {
       const start = dateFactory('2014-08-10 09:30');
       const end = dateFactory('2014-08-10 12:30');
       expect(rangeDate(start, end)).toEqual([
