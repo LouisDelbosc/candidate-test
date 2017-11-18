@@ -7,6 +7,17 @@ import knex from 'knexClient'
 //   return open
 // }
 
+const cloneDate = (momentDate) => {
+  return moment(momentDate.toDate());
+};
+
+const toOpening = (start, end) => {
+  return {
+    starts_at: start,
+    ends_at: end
+  };
+};
+
 export const getOpenings = async (date) => {
   const date_with_7_days = moment(date).add(7, 'days');
   const reccuring_opening = await knex('events')
@@ -19,12 +30,17 @@ export const getOpenings = async (date) => {
         .andWhere('starts_at', '>=', date.getTime())
         .andWhere('ends_at', '<=', date_with_7_days.valueOf());
 
-  return [...reccuring_opening, ...weekly_opening].map(opening => {
-    return {
-      starts_at: moment(opening.starts_at),
-      ends_at: moment(opening.ends_at)
-    };
-  });
+  return [...reccuring_opening, ...weekly_opening]
+    .map(opening => toOpening(moment(opening.starts_at), moment(opening.ends_at)));
+};
+
+export const intoCurrentWeek = (day, reccuring_opening) => {
+  const { starts_at, ends_at } = reccuring_opening;
+  while (starts_at < day) {
+    starts_at.add(7, 'days');
+    ends_at.add(7, 'days');
+  }
+  return toOpening(cloneDate(starts_at), cloneDate(ends_at));
 };
 
 export const rangeDate = (start, end, step=30, unit='minutes') => {
@@ -34,20 +50,8 @@ export const rangeDate = (start, end, step=30, unit='minutes') => {
   let slots = [];
   let date_iterator = start.clone();
   while (date_iterator < end) {
-    slots = [...slots, moment(date_iterator.toDate())];
+    slots = [...slots, cloneDate(date_iterator)]; // To make a complete new momentdate
     date_iterator.add(step, unit);
   }
   return slots;
-}
-
-export const generateSlots = (opening) => {
-  // let slots = [];
-  // for(let date_iter = moment(starts_at); date_iter.isBefore(ends_at); date_iter.add(30, 'mins')) {
-  //   slots.push(date_iter);
-  // }
-}
-
-
-export const generate_slots = (opening_event) => {
-  return
-}
+};

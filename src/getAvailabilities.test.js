@@ -1,6 +1,6 @@
 import knex from 'knexClient';
 import moment from 'moment'
-import { getAvailabilities, getOpenings, rangeDate } from './getAvailabilities';
+import { getAvailabilities, getOpenings, rangeDate, intoCurrentWeek } from './getAvailabilities';
 
 const openingFactory = (args = {}) => {
   return Object.assign({
@@ -9,10 +9,37 @@ const openingFactory = (args = {}) => {
     ends_at: new Date('2014-08-04 12:30'),
     weekly_recurring: true
   }, args);
-}
+};
+
+const dateFactory = (date) => {
+  return moment(new Date(date));
+};
 
 describe('getAvailabilities', () => {
   beforeEach(() => knex('events').truncate());
+
+  describe('intoCurrentWeek()', () => {
+    it('should not modify an opening if it is on the same week', () => {
+      const day = dateFactory('2014-08-11');
+      const reccuring_opening = {
+        starts_at: dateFactory('2014-08-12 09:30'),
+        ends_at: dateFactory('2014-08-12 12:30')
+      };
+      expect(intoCurrentWeek(day, reccuring_opening)).toEqual(reccuring_opening);
+    });
+
+    it('should update a past opening to the week of the day', () => {
+      const day = dateFactory('2014-08-11');
+      const reccuring_opening = {
+        starts_at: dateFactory('2014-08-04 09:30'),
+        ends_at: dateFactory('2014-08-04 12:30')
+      };
+      expect(intoCurrentWeek(day, reccuring_opening)).toEqual({
+        starts_at: dateFactory('2014-08-11 09:30'),
+        ends_at: dateFactory('2014-08-11 12:30')
+      });
+    });
+  });
 
   describe('getOpenings', async () => {
     it('should get recurring opening where starts_date < arg_date', async () => {
@@ -61,21 +88,21 @@ describe('getAvailabilities', () => {
 
   describe('generateSlots', () => {
     it('should generate all the date between two date with 30min interval', () => {
-      const start = moment(new Date('2014-08-10 12:30'));
-      const end = moment(new Date('2014-08-10 09:30'));
+      const start = dateFactory('2014-08-10 12:30');
+      const end = dateFactory('2014-08-10 09:30');
       expect(rangeDate(start, end)).toEqual([]);
     });
 
     it('should generate all the date between two date with 30min interval', () => {
-      const start = moment(new Date('2014-08-10 09:30'));
-      const end = moment(new Date('2014-08-10 12:30'));
+      const start = dateFactory('2014-08-10 09:30');
+      const end = dateFactory('2014-08-10 12:30');
       expect(rangeDate(start, end)).toEqual([
-        moment(new Date('2014-08-10 09:30')),
-        moment(new Date('2014-08-10 10:00')),
-        moment(new Date('2014-08-10 10:30')),
-        moment(new Date('2014-08-10 11:00')),
-        moment(new Date('2014-08-10 11:30')),
-        moment(new Date('2014-08-10 12:00')),
+        dateFactory('2014-08-10 09:30'),
+        dateFactory('2014-08-10 10:00'),
+        dateFactory('2014-08-10 10:30'),
+        dateFactory('2014-08-10 11:00'),
+        dateFactory('2014-08-10 11:30'),
+        dateFactory('2014-08-10 12:00'),
       ]);
     });
   });
