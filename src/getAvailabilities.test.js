@@ -5,6 +5,7 @@ import {
   getOpenings,
   getAppointment,
   filterAppointment,
+  formatAvailabilities,
   rangeDate,
   intoCurrentWeek,
   groupby,
@@ -50,17 +51,17 @@ describe('utils', () => {
         dateFactory('2014-08-12 11:30'),
         dateFactory('2014-08-12 12:00'),
       ];
-      const groupbyDate = groupby(datetime_array, (date) => String(date.clone().startOf('days')));
+      const groupbyDate = groupby(datetime_array, (date) => date.clone().startOf('days'));
       expect(groupbyDate).toEqual({
-        [String(dateFactory('2014-08-10').startOf('days'))]: [
+        [dateFactory('2014-08-10').startOf('days')]: [
           dateFactory('2014-08-10 09:30'),
           dateFactory('2014-08-10 10:00'),
           dateFactory('2014-08-10 10:30'),
         ],
-        [String(dateFactory('2014-08-11').startOf('days'))]: [
+        [dateFactory('2014-08-11').startOf('days')]: [
           dateFactory('2014-08-11 11:00'),
         ],
-        [String(dateFactory('2014-08-12').startOf('days'))]: [
+        [dateFactory('2014-08-12').startOf('days')]: [
           dateFactory('2014-08-12 11:30'),
           dateFactory('2014-08-12 12:00'),
         ]
@@ -71,6 +72,47 @@ describe('utils', () => {
 
 describe('getAvailabilities', () => {
   beforeEach(() => knex('events').truncate());
+
+  describe('formatAvailabilities()', () => {
+    const slotByDay = {
+      [dateFactory('2014-08-10').startOf('days')]: [
+        dateFactory('2014-08-10 09:30'),
+        dateFactory('2014-08-10 10:00'),
+        dateFactory('2014-08-10 10:30'),
+      ],
+      [dateFactory('2014-08-11').startOf('days')]: [
+        dateFactory('2014-08-11 11:00'),
+      ],
+      [dateFactory('2014-08-12').startOf('days')]: [
+        dateFactory('2014-08-12 11:30'),
+        dateFactory('2014-08-12 12:00'),
+      ]
+    };
+    expect(formatAvailabilities(dateFactory('2014-08-10'), slotByDay)).toEqual([
+      {
+        date: dateFactory('2014-08-10').startOf('days'),
+        slots: ['09:30', '10:00', '10:30']
+      }, {
+        date: dateFactory('2014-08-11').startOf('days'),
+        slots: ['11:00']
+      }, {
+        date: dateFactory('2014-08-12').startOf('days'),
+        slots: ['11:30', '12:00']
+      }, {
+        date: dateFactory('2014-08-13').startOf('days'),
+        slots: []
+      }, {
+        date: dateFactory('2014-08-14').startOf('days'),
+        slots: []
+      }, {
+        date: dateFactory('2014-08-15').startOf('days'),
+        slots: []
+      }, {
+        date: dateFactory('2014-08-16').startOf('days'),
+        slots: []
+      }
+    ]);
+  });
 
   describe('filterAppointment', () => {
     const appointment = {
@@ -230,45 +272,45 @@ describe('getAvailabilities', () => {
     });
   });
 
-  // describe('simple case', () => {
-  //   beforeEach(async () => {
-  //     await knex('events').insert([
-  //       {
-  //         kind: 'opening',
-  //         starts_at: new Date('2014-08-04 09:30'),
-  //         ends_at: new Date('2014-08-04 12:30'),
-  //         weekly_recurring: true,
-  //       },
-  //       {
-  //         kind: 'appointment',
-  //         starts_at: new Date('2014-08-11 10:30'),
-  //         ends_at: new Date('2014-08-11 11:30'),
-  //       },
-  //     ]);
-  //   });
+  describe('simple case', () => {
+    beforeEach(async () => {
+      await knex('events').insert([
+        {
+          kind: 'opening',
+          starts_at: new Date('2014-08-04 09:30'),
+          ends_at: new Date('2014-08-04 12:30'),
+          weekly_recurring: true,
+        },
+        {
+          kind: 'appointment',
+          starts_at: new Date('2014-08-11 10:30'),
+          ends_at: new Date('2014-08-11 11:30'),
+        },
+      ]);
+    });
 
-  //   it('should fetch availabilities correctly', async () => {
-  //     const availabilities = await getAvailabilities(new Date('2014-08-10'));
-  //     expect(availabilities.length).toBe(7);
+    it('should fetch availabilities correctly', async () => {
+      const availabilities = await getAvailabilities(new Date('2014-08-10'));
+      expect(availabilities.length).toBe(7);
 
-  //     expect(String(availabilities[0].date)).toBe(
-  //       String(new Date('2014-08-10')),
-  //     );
-  //     expect(availabilities[0].slots).toEqual([]);
+      expect(String(availabilities[0].date)).toBe(
+        String(dateFactory('2014-08-10').startOf('days')),
+      );
+      expect(availabilities[0].slots).toEqual([]);
 
-  //     expect(String(availabilities[1].date)).toBe(
-  //       String(new Date('2014-08-11')),
-  //     );
-  //     expect(availabilities[1].slots).toEqual([
-  //       '9:30',
-  //       '10:00',
-  //       '11:30',
-  //       '12:00',
-  //     ]);
+      expect(String(availabilities[1].date)).toBe(
+        String(dateFactory('2014-08-11').startOf('days')),
+      );
+      expect(availabilities[1].slots).toEqual([
+        '09:30',
+        '10:00',
+        '11:30',
+        '12:00',
+      ]);
 
-  //     expect(String(availabilities[6].date)).toBe(
-  //       String(new Date('2014-08-16')),
-  //     );
-  //   });
-  // });
+      expect(String(availabilities[6].date)).toBe(
+        String(dateFactory('2014-08-16').startOf('days')),
+      );
+    });
+  });
 });

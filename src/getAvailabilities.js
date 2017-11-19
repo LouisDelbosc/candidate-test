@@ -10,8 +10,8 @@ export async function getAvailabilities(date) {
         .reduce((acc, {starts_at, ends_at}) => [...acc, ...rangeDate(starts_at, ends_at)], []);
   const availableSlots = appointments
         .reduce((acc, appointment) => filterAppointment(appointment, acc), openingSlots);
-  const groupbyDate = groupby(availableSlots, (date) => String(date.clone().startOf('days')));
-  return groupbyDate;
+  const groupbyDate = groupby(availableSlots, (date) => date.clone().startOf('days'));
+  return formatAvailabilities(momentDate, groupbyDate);
 }
 
 const cloneDate = (momentDate) => {
@@ -34,6 +34,18 @@ export const groupby = (list, func) => {
     return Object.assign(acc, {[key]: [ ...oldValue, value]});
   }, {});
 };
+
+export const formatAvailabilities = (date, slotsByDay) => {
+  const week_days = rangeDate(date, date.clone().add(7, 'days'), 1, 'days');
+  return week_days.map(datetime => {
+    const day = datetime.startOf('days');
+    const slotsDay = slotsByDay[String(day)] || [];
+    return {
+      date: day,
+      slots: slotsDay.map(date => date.format('HH:mm'))
+    };
+  });
+}
 
 export const filterAppointment = (appointment, slots) => {
   const appointmentRange = rangeDate(appointment.starts_at, appointment.ends_at);
