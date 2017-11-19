@@ -1,17 +1,24 @@
 import moment from 'moment'
 import knex from 'knexClient'
 
-// export async function getAvailabilities(date) {
-//   // Implement your algorithm here
-//   const opens = await getOpenings(date)
-//   const slots = generateSlot(opens)
-//   groupby(slot, day)
-//   formatAvailabilities(day, groupbied)
-// }
+export async function getAvailabilities(date) {
+  // Implement your algorithm here
+  const momentDate = moment(date);
+  const openings = await getOpenings(momentDate);
+  const appointments = await getAppointment(momentDate);
+  const openingSlots = openings
+        .reduce((acc, {starts_at, ends_at}) => [...acc, ...rangeDate(starts_at, ends_at)], []);
+  const availableSlots = appointments
+        .reduce((acc, appointment) => filterAppointment(appointment, acc), openingSlots);
+  const groupbyDate = groupby(availableSlots, (date) => String(date.clone().startOf('days')));
+  return groupbyDate;
+}
 
 const cloneDate = (momentDate) => {
   return moment(momentDate.toDate());
 };
+
+const toAppointment = (...args) => toOpening(...args);
 
 const toOpening = (start, end) => {
   return {
@@ -28,6 +35,23 @@ export const groupby = (list, func) => {
   }, {});
 };
 
+export const filterAppointment = (appointment, slots) => {
+  const appointmentRange = rangeDate(appointment.starts_at, appointment.ends_at);
+  return slots.filter(slot => !(appointmentRange).find(x => slot.isSame(x)));
+};
+
+export const getAppointment = async (date) => {
+  const date_with_7_days = cloneDate(date).add(7, 'days');
+  return knex('events')
+    .select('starts_at', 'ends_at')
+    .where({kind: 'appointment'})
+    .andWhere('starts_at', '>=', date.valueOf())
+    .andWhere('ends_at', '<=', date_with_7_days.valueOf())
+    .then(
+      appointments => appointments
+        .map(({starts_at, ends_at}) => toAppointment(moment(starts_at), moment(ends_at))));
+};
+
 export const getOpenings = async (date) => {
   const date_with_7_days = cloneDate(date).add(7, 'days');
   const reccuring_opening = await knex('events')
@@ -41,7 +65,7 @@ export const getOpenings = async (date) => {
         .andWhere('ends_at', '<=', date_with_7_days.valueOf());
 
   return [...reccuring_opening, ...weekly_opening]
-    .map(opening => toOpening(moment(opening.starts_at), moment(opening.ends_at)))
+    .map(({starts_at, ends_at}) => toOpening(moment(starts_at), moment(ends_at)))
     .map(opening => intoCurrentWeek(date, opening));
 };
 

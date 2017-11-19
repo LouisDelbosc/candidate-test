@@ -3,6 +3,8 @@ import moment from 'moment';
 import {
   getAvailabilities,
   getOpenings,
+  getAppointment,
+  filterAppointment,
   rangeDate,
   intoCurrentWeek,
   groupby,
@@ -14,6 +16,14 @@ const openingFactory = (args = {}) => {
     starts_at: new Date('2014-08-04 09:30'),
     ends_at: new Date('2014-08-04 12:30'),
     weekly_recurring: true
+  }, args);
+};
+
+const appointmentFactory = (args = {}) => {
+  return Object.assign({
+    kind: 'appointment',
+    starts_at: new Date('2014-08-10 09:30'),
+    ends_at: new Date('2014-08-10 12:30')
   }, args);
 };
 
@@ -62,6 +72,27 @@ describe('utils', () => {
 describe('getAvailabilities', () => {
   beforeEach(() => knex('events').truncate());
 
+  describe('filterAppointment', () => {
+    const appointment = {
+      starts_at: dateFactory('2014-08-12 10:30'),
+      ends_at: dateFactory('2014-08-12 11:30'),
+    };
+    const slots = [
+      dateFactory('2014-08-12 09:30'),
+      dateFactory('2014-08-12 10:00'),
+      dateFactory('2014-08-12 10:30'),
+      dateFactory('2014-08-12 11:00'),
+      dateFactory('2014-08-12 11:30'),
+      dateFactory('2014-08-12 12:00'),
+    ];
+    expect(filterAppointment(appointment, slots)).toEqual([
+      dateFactory('2014-08-12 09:30'),
+      dateFactory('2014-08-12 10:00'),
+      dateFactory('2014-08-12 11:30'),
+      dateFactory('2014-08-12 12:00'),
+    ]);
+  });
+
   describe('intoCurrentWeek()', () => {
     it('should not modify an opening if it is on the same week', () => {
       const day = dateFactory('2014-08-11');
@@ -82,6 +113,39 @@ describe('getAvailabilities', () => {
         starts_at: dateFactory('2014-08-11 09:30'),
         ends_at: dateFactory('2014-08-11 12:30')
       });
+    });
+  });
+
+  describe('getAppointment()', async () => {
+    it('should not get openings', async () => {
+      const opening = openingFactory();
+      await knex('events').insert(opening);
+      const appointment = await getAppointment(dateFactory('2014-08-10'));
+      expect(appointment.length).toBe(0)
+    });
+
+    it('should not get past or futur appointment', async () => {
+      const pastAppointment = appointmentFactory({
+        starts_at: new Date('2014-08-04 09:30'),
+        ends_at: new Date('2014-08-04 10:00'),
+      });
+      const futurAppointment = appointmentFactory({
+        starts_at: new Date('2014-08-20 09:30'),
+        ends_at: new Date('2014-08-20 10:00'),
+      });
+      await knex('events').insert([pastAppointment, futurAppointment]);
+      const appointment = await getAppointment(dateFactory('2014-08-10'));
+      expect(appointment.length).toBe(0)
+    });
+
+    it('should get week appointment', async () => {
+      const weekAppointment = appointmentFactory({
+        starts_at: new Date('2014-08-12 09:30'),
+        ends_at: new Date('2014-08-12 10:00'),
+      });
+      await knex('events').insert(weekAppointment);
+      const appointment = await getAppointment(dateFactory('2014-08-10'));
+      expect(appointment.length).toBe(1)
     });
   });
 
@@ -180,31 +244,31 @@ describe('getAvailabilities', () => {
   //         starts_at: new Date('2014-08-11 10:30'),
   //         ends_at: new Date('2014-08-11 11:30'),
   //       },
-  //     ])
-  //   })
+  //     ]);
+  //   });
 
   //   it('should fetch availabilities correctly', async () => {
-  //     const availabilities = await getAvailabilities(new Date('2014-08-10'))
-  //     expect(availabilities.length).toBe(7)
+  //     const availabilities = await getAvailabilities(new Date('2014-08-10'));
+  //     expect(availabilities.length).toBe(7);
 
   //     expect(String(availabilities[0].date)).toBe(
   //       String(new Date('2014-08-10')),
-  //     )
-  //     expect(availabilities[0].slots).toEqual([])
+  //     );
+  //     expect(availabilities[0].slots).toEqual([]);
 
   //     expect(String(availabilities[1].date)).toBe(
   //       String(new Date('2014-08-11')),
-  //     )
+  //     );
   //     expect(availabilities[1].slots).toEqual([
   //       '9:30',
   //       '10:00',
   //       '11:30',
   //       '12:00',
-  //     ])
+  //     ]);
 
   //     expect(String(availabilities[6].date)).toBe(
   //       String(new Date('2014-08-16')),
-  //     )
-  //   })
-  // })
-})
+  //     );
+  //   });
+  // });
+});
